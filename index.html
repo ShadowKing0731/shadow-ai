@@ -1,1 +1,29 @@
-<!DOCTYPE html><html><head><title>Shadow AI v2.0</title></head><body><h1>Shadow AI is listening...</h1></body></html>
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Shadow AI</title>
+  <style>
+    body { font-family: sans-serif; background: #0e0e0e; color: #fff; text-align: center; padding-top: 50px; }
+    input, button { padding: 10px; margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <h1>🧠 Shadow AI</h1>
+  <p>Ask me anything…</p>
+  <input id="msg" placeholder="Type your message">
+  <button onclick="ask()">Ask</button>
+  <p id="response"></p>
+  <script>
+    async function ask() {
+      const msg = document.getElementById("msg").value;
+      const res = await fetch("/shadow", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: msg })
+      });
+      const data = await res.json();
+      document.getElementById("response").innerText = data.response;
+    }
+  </script>
+</body>
+</html>
