@@ -1,38 +1,74 @@
+require('dotenv').config();
 const express = require('express');
 const bodyParser = require('body-parser');
+const fetch = require('node-fetch');
 const fs = require('fs');
-const OpenAI = require('openai');
-require('dotenv').config();
 
 const app = express();
 app.use(bodyParser.json());
-app.use(express.static('public'));
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
-
-let memory = JSON.parse(fs.readFileSync('shadowConfig.json', 'utf-8'));
-let voice = JSON.parse(fs.readFileSync('voiceprint.json', 'utf-8'));
+let config = JSON.parse(fs.readFileSync('./shadowConfig.json', 'utf-8'));
+let voiceprint = JSON.parse(fs.readFileSync('./voiceprint.json', 'utf-8'));
 
 app.post('/shadow', async (req, res) => {
-  const { prompt, userVoice } = req.body;
+    const { message, userVoiceID } = req.body;
+    if (userVoiceID !== voiceprint.ownerVoiceID) {
+        return res.status(403).send('Unauthorized Voice');
+    }
 
-  if (userVoice !== voice.owner) {
-    return res.status(403).send('Access Denied: Unauthorized Voice');
-  }
+    const ai = config.selectedAI;
+    let apiResponse = '';
 
-  try {
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o",
-      messages: [{ role: "user", content: prompt }],
-    });
+    try {
+        if (ai === 'gemini') {
+            apiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${process.env.GEMINI_API_KEY}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: message }] }]
+                })
+            });
+        } else if (ai === 'gpt4') {
+            apiResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`
+                },
+                body: JSON.stringify({
+                    model: 'openai/gpt-4',
+                    messages: [{ role: 'user', content: message }]
+                })
+            });
+        } else if (ai === 'grok') {
+            apiResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`
+                },
+                body: JSON.stringify({
+                    model: 'xai/grok-1',
+                    messages: [{ role: 'user', content: message }]
+                })
+            });
+        } else if (ai === 'mistral') {
+            apiResponse = await fetch('https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.1', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${process.env.HUGGINGFACE_TOKEN}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ inputs: message })
+            });
+        }
 
-    res.json({ reply: completion.choices[0].message.content });
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).send('AI Brain Error');
-  }
+        const data = await apiResponse.json();
+        return res.send(data);
+    } catch (err) {
+        console.error('AI Server Error:', err);
+        return res.status(500).send('Shadow AI error.');
+    }
 });
 
-app.listen(3000, () => console.log('🧠 Shadow AI Core running on port 3000'));
+app.listen(3000, () => console.log('🧠 Shadow AI backend running on port 3000'));
