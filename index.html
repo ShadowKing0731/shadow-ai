@@ -1,31 +1,63 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8">
   <title>Shadow AI</title>
-  <style>
-    body {
-      font-family: 'Segoe UI', sans-serif;
-      background: #0e0e0e;
-      color: #00ffe7;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-      margin: 0;
-    }
-    h1 {
-      font-size: 2em;
-    }
-    p {
-      font-size: 1.1em;
-    }
-  </style>
 </head>
-<body>
-  <h1>🧠 Shadow AI</h1>
-  <p>Your Voice Assistant is Active and Ready.</p>
-  <p>Say <strong>"Shadow"</strong> to activate me.</p>
+<body style="background:#000;color:#0f0;font-family:monospace;text-align:center;padding:40px">
+  <h1>🧠 Shadow AI is Listening</h1>
+  <button id="startBtn">🎙️ Say Something</button>
+  <p id="status">Status: Idle</p>
+  <p id="response"></p>
+
+  <script>
+    const startBtn = document.getElementById('startBtn');
+    const statusText = document.getElementById('status');
+    const responseText = document.getElementById('response');
+
+    // 🎙️ Speech recognition
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'te-IN'; // Telugu + English
+    recognition.interimResults = false;
+    recognition.continuous = false;
+
+    // 🧠 TTS
+    function speak(text) {
+      const msg = new SpeechSynthesisUtterance(text);
+      msg.lang = 'en-IN';
+      msg.voice = speechSynthesis.getVoices().find(v => v.lang.includes('en') || v.lang.includes('te'));
+      speechSynthesis.speak(msg);
+    }
+
+    startBtn.onclick = () => {
+      statusText.innerText = 'Listening...';
+      recognition.start();
+    };
+
+    recognition.onresult = async (event) => {
+      const command = event.results[0][0].transcript;
+      statusText.innerText = `You said: ${command}`;
+      const body = {
+        message: command,
+        userVoiceID: "bharath123"
+      };
+
+      responseText.innerText = "Thinking...";
+
+      const res = await fetch("/shadow", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      });
+
+      const data = await res.json();
+      responseText.innerText = data.response;
+      speak(data.response);
+    };
+
+    recognition.onerror = (e) => {
+      statusText.innerText = "❌ Error: " + e.error;
+    };
+  </script>
 </body>
 </html>
