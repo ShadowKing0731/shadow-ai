@@ -1,63 +1,91 @@
 <!DOCTYPE html>
-<html>
+<html lang="te">
 <head>
-  <title>Shadow AI</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>🧠 Shadow AI</title>
+  <style>
+    body {
+      background-color: #0f0f0f;
+      color: #00ffe1;
+      font-family: 'Segoe UI', sans-serif;
+      padding: 20px;
+      text-align: center;
+    }
+    h1 {
+      color: #00ffe1;
+    }
+    button {
+      background-color: #00ffe1;
+      color: black;
+      font-size: 18px;
+      padding: 10px 20px;
+      border: none;
+      margin: 10px;
+      cursor: pointer;
+      border-radius: 8px;
+    }
+    #response {
+      margin-top: 30px;
+      font-size: 20px;
+      color: #ffffff;
+    }
+  </style>
 </head>
-<body style="background:#000;color:#0f0;font-family:monospace;text-align:center;padding:40px">
-  <h1>🧠 Shadow AI is Listening</h1>
-  <button id="startBtn">🎙️ Say Something</button>
-  <p id="status">Status: Idle</p>
-  <p id="response"></p>
+<body>
+  <h1>🕶️ Shadow AI - Voice Assistant</h1>
+  <p>🎙️ Speak in Telugu + English</p>
+  <button onclick="startListening()">🎧 Activate Shadow</button>
+  <div id="response">Awaiting command...</div>
 
   <script>
-    const startBtn = document.getElementById('startBtn');
-    const statusText = document.getElementById('status');
-    const responseText = document.getElementById('response');
+    const serverUrl = "https://shadow-ai-9xim.onrender.com";
 
-    // 🎙️ Speech recognition
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    const recognition = new SpeechRecognition();
-    recognition.lang = 'te-IN'; // Telugu + English
-    recognition.interimResults = false;
-    recognition.continuous = false;
+    function startListening() {
+      const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+      recognition.lang = 'te-IN'; // Telugu + English understanding
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
 
-    // 🧠 TTS
-    function speak(text) {
-      const msg = new SpeechSynthesisUtterance(text);
-      msg.lang = 'en-IN';
-      msg.voice = speechSynthesis.getVoices().find(v => v.lang.includes('en') || v.lang.includes('te'));
-      speechSynthesis.speak(msg);
-    }
+      document.getElementById("response").innerText = "🎙️ Listening...";
 
-    startBtn.onclick = () => {
-      statusText.innerText = 'Listening...';
       recognition.start();
-    };
 
-    recognition.onresult = async (event) => {
-      const command = event.results[0][0].transcript;
-      statusText.innerText = `You said: ${command}`;
-      const body = {
-        message: command,
-        userVoiceID: "bharath123"
+      recognition.onresult = function(event) {
+        const voiceText = event.results[0][0].transcript;
+        document.getElementById("response").innerText = "🧾 You said: " + voiceText;
+
+        fetch(serverUrl + "/shadow", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message: voiceText,
+            userVoiceID: "bharath123"
+          })
+        })
+        .then(res => res.json())
+        .then(data => {
+          const reply = data.response || data.error || "❌ No response from Shadow.";
+          document.getElementById("response").innerText = "🧠 Shadow: " + reply;
+          speak(reply);
+        })
+        .catch(err => {
+          document.getElementById("response").innerText = "❌ Error: " + err.message;
+        });
       };
 
-      responseText.innerText = "Thinking...";
+      recognition.onerror = function(err) {
+        document.getElementById("response").innerText = "🎤 Error: " + err.error;
+      };
+    }
 
-      const res = await fetch("/shadow", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body)
-      });
-
-      const data = await res.json();
-      responseText.innerText = data.response;
-      speak(data.response);
-    };
-
-    recognition.onerror = (e) => {
-      statusText.innerText = "❌ Error: " + e.error;
-    };
+    function speak(text) {
+      const speech = new SpeechSynthesisUtterance();
+      speech.lang = 'te-IN';
+      speech.text = text;
+      speech.voice = speechSynthesis.getVoices().find(v => v.lang === 'te-IN') || null;
+      window.speechSynthesis.speak(speech);
+    }
   </script>
 </body>
 </html>
