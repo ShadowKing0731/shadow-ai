@@ -4,29 +4,26 @@ const fetch = require('node-fetch');
 const fs = require('fs');
 const path = require('path');
 const dotenv = require('dotenv');
-
 dotenv.config();
 
 const app = express();
 app.use(bodyParser.json());
 app.use(express.static('.'));
 
+// Shadow config
 const configPath = './shadowConfig.json';
-const voiceDataPath = './voiceprint.json';
 
-// 🧠 Load selected AI engine (Gemini, GPT-4, etc.)
 function getSelectedAI() {
   const data = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
   return data.selectedAI || 'gemini';
 }
 
-// 🧬 Voice authentication
-function verifyVoice(userVoiceID) {
-  const saved = JSON.parse(fs.readFileSync(voiceDataPath, 'utf-8'));
-  return userVoiceID === saved.ownerVoiceID;
+function updateAIEngine(newModel) {
+  const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+  config.selectedAI = newModel;
+  fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
 }
 
-// 🔌 Talk to AI
 async function queryAI(prompt, model) {
   if (model === 'gemini') {
     const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${process.env.GEMINI_API_KEY}`, {
@@ -36,7 +33,14 @@ async function queryAI(prompt, model) {
     });
     const data = await res.json();
     return data.candidates?.[0]?.content?.parts?.[0]?.text || 'No response';
-  } else if (['gpt4', 'grok', 'llama'].includes(model)) {
+  }
+
+  if (['gpt4', 'grok', 'llama'].includes(model)) {
+    const modelMap = {
+      gpt4: 'openai/gpt-4o',
+      grok: 'xai/grok-1',
+      llama: 'meta-llama/llama-3-8b-instruct'
+    };
     const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -44,14 +48,15 @@ async function queryAI(prompt, model) {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: model === 'gpt4' ? 'openai/gpt-4o' :
-               model === 'grok' ? 'xai/grok-1' : 'meta-llama/llama-3-8b-instruct',
+        model: modelMap[model],
         messages: [{ role: 'user', content: prompt }]
       })
     });
     const data = await res.json();
     return data.choices?.[0]?.message?.content || 'No response';
-  } else if (model === 'mistral') {
+  }
+
+  if (model === 'mistral') {
     const res = await fetch('https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.1', {
       method: 'POST',
       headers: {
@@ -63,33 +68,46 @@ async function queryAI(prompt, model) {
     const data = await res.json();
     return data[0]?.generated_text || 'No response';
   }
+
+  return 'No model selected';
 }
 
-// 🌐 Serve the HTML dashboard
+// Routes
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// 🤖 Main Shadow AI API route
 app.post('/shadow', async (req, res) => {
   const { message, userVoiceID } = req.body;
+  console.log(`🎙️ ${userVoiceID}: ${message}`);
 
-  if (!verifyVoice(userVoiceID)) {
-    return res.status(403).json({ error: 'Unauthorized voice' });
+  const lowered = message.toLowerCase();
+
+  if (lowered.includes('switch to gpt')) {
+    updateAIEngine('gpt4');
+    return res.json({ response: '✅ Switched to GPT-4o successfully.' });
+  } else if (lowered.includes('switch to gemini')) {
+    updateAIEngine('gemini');
+    return res.json({ response: '✅ Gemini is now your AI brain.' });
+  } else if (lowered.includes('switch to grok')) {
+    updateAIEngine('grok');
+    return res.json({ response: '✅ Switched to Grok AI.' });
+  } else if (lowered.includes('switch to llama')) {
+    updateAIEngine('llama');
+    return res.json({ response: '✅ Using LLaMA model now.' });
   }
 
   try {
     const model = getSelectedAI();
-    const response = await queryAI(message, model);
-    res.json({ response });
+    const reply = await queryAI(message, model);
+    res.json({ response: reply });
   } catch (err) {
-    console.error('Shadow AI error:', err);
+    console.error('❌ Shadow AI error:', err);
     res.status(500).json({ error: 'AI server error' });
   }
 });
 
-// 🚀 Start the server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`🧠 Shadow AI running on http://localhost:${PORT}`);
+  console.log(`🧠 Shadow AI ready at http://localhost:${PORT}`);
 });

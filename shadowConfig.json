@@ -1,3 +1,31 @@
 {
-  "selectedAI": "gemini"
+  "selectedAI": "gemini",
+  "availableAIs": {
+    "gemini": {
+      "label": "Google Gemini",
+      "enabled": true
+    },
+    "gpt4": {
+      "label": "OpenAI GPT-4o",
+      "enabled": true
+    },
+    "grok": {
+      "label": "xAI Grok-1",
+      "enabled": true
+    },
+    "llama": {
+      "label": "Meta LLaMA 3",
+      "enabled": true
+    },
+    "mistral": {
+      "label": "Mistral 7B",
+      "enabled": true
+    }
+  },
+  "defaultVoiceID": "bharath123",
+  "language": {
+    "primary": "telugu",
+    "secondary": "english",
+    "mode": "telish"
+  }
 }
